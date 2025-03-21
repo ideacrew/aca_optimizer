@@ -1,0 +1,17 @@
+AllCops:
+  TargetRubyVersion: 3.0
+  Exclude:
+    - benchmark.rb
+    - tmp/**/*
+    - ext_doc/**/*
+  NewCops: disable
+  SuggestExtensions: false
+
+Metrics/MethodLength:
+  Max: 20
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes

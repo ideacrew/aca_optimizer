@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export CARGO_MANIFEST_DIR=`pwd`/ext/openhbx_rate_calculator
+export RUBY=`which ruby`
+cargo $*

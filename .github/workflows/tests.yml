@@ -1,0 +1,40 @@
+name: Tests
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  codelint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          rubygems: 3.3.11
+      - name: Install Gems
+        run:
+          bundle install
+      - name: Run Rubocop
+        run: |
+          bundle exec rubocop
+      - name: Run Clippy
+        run: |
+          ./cargoci clippy
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          rubygems: 3.3.11
+      - name: Install Gems
+        run:
+          bundle install
+      - name: Run Tests
+        run: |
+          bundle exec rake test
+      
