@@ -11,6 +11,9 @@ use crate::rate_lookup::types::*;
 
 mod ruby_defs;
 
+mod argument_conversions;
+use crate::rate_lookup::argument_conversions::*;
+
 #[doc(hidden)]
 fn lookup_rate(
     rate_dictionary: &ProductRateDirectory,
@@ -33,7 +36,7 @@ fn lookup_rate(
                 coverage_age: lookup_age,
                 product_id: rate_lookup.product_id,
                 tobacco_use: rate_lookup.tobacco_use.clone(),
-                rating_area_tag: rate_lookup.rating_area_tag
+                rating_area_tag: rate_lookup.rating_area_tag,
             };
             match rate_hash.get(&corrected_lookup) {
                 None => Err(RateLookupError::NoMatchingRate(
@@ -41,7 +44,7 @@ fn lookup_rate(
                     *rate_schedule_date,
                     rate_lookup.rating_area_tag,
                     lookup_age,
-                    rate_lookup.tobacco_use.clone()
+                    rate_lookup.tobacco_use.clone(),
                 )),
                 Some(rt) => {
                     match rt.iter().find(|e| {
@@ -51,30 +54,11 @@ fn lookup_rate(
                             rate_lookup.product_id,
                             *rate_schedule_date,
                         )),
-                        Some(sc) => Ok(sc.cost)
+                        Some(sc) => Ok(sc.cost),
                     }
                 }
             }
         }
-    }
-}
-
-#[doc(hidden)]
-fn parse_maybe_tobacco_use(str_val: Option<String>) -> Result<TobaccoUse, String> {
-    match str_val {
-      None => Ok(TobaccoUse::Unknown),
-      Some(x) => parse_tobacco_use(&x)
-    }
-}
-
-#[doc(hidden)]
-fn parse_tobacco_use(str_val: &str) -> Result<TobaccoUse, String> {
-    match str_val {
-        "Y" => Ok(TobaccoUse::Yes),
-        "N" => Ok(TobaccoUse::No),
-        "U" => Ok(TobaccoUse::Unknown),
-        "NA" => Ok(TobaccoUse::Unknown),
-        _ => Err(str_val.to_string())
     }
 }
 
@@ -106,7 +90,7 @@ fn insert_rate_value(
         product_id: product_id.to_owned(),
         rating_area_tag: ra_tag.to_owned(),
         tobacco_use: tobacco_value.to_owned(),
-        coverage_age
+        coverage_age,
     };
     let rate_collection = &mut rate_hash.rate_collection;
     match rate_collection.get_mut(&lookup) {
@@ -164,78 +148,22 @@ impl RateCache {
         rb_self: magnus::typed_data::Obj<Self>,
         args: &[Value],
     ) -> Result<(), Error> {
-        let args = magnus::scan_args::scan_args::<
-            (
-                String,
-                i16,
-                i16,
-                String,
-                String,
-                String,
-                i16,
-                String,
-                f64
-            ),
-            (),
-            (),
-            (),
-            (),
-            (),
-        >(args);
-        match args {
-            Err(x) => Err(x),
-            Ok(m_args) => {
-                let (
-                    product_id_string,
-                    min_age,
-                    max_age,
-                    rating_area_tag,
-                    rate_date_start_str,
-                    rate_date_end_str,
-                    coverage_age,
-                    tobacco_use_str,
-                    cost,
-                ) = m_args.required;
-                let mut product_id: [u8; 24] = Default::default();
-                product_id[..product_id_string.len()].copy_from_slice(product_id_string.as_bytes());
-                match NaiveDate::parse_from_str(&rate_date_start_str, "%Y-%m-%d") {
-                    Err(srd_e) => Err(Error::new(
-                        ruby.exception_arg_error(),
-                        format!("{:?}: invalid rate start date", srd_e),
-                    )),
-                    Ok(srd) => match NaiveDate::parse_from_str(&rate_date_end_str, "%Y-%m-%d") {
-                        Err(erd_e) => Err(Error::new(
-                            ruby.exception_arg_error(),
-                            format!("{:?}: invalid rate end date", erd_e),
-                        )),
-                        Ok(erd) => match parse_tobacco_use(&tobacco_use_str) {
-                            Err(tus_e) => Err(Error::new(
-                                ruby.exception_arg_error(),
-                                format!("{:?} is not a valid value for tobacco_use", tus_e),
-                            )),
-                            Ok(tus) => {
-                                let rate_hash = &mut rb_self.product_rates.borrow_mut();
-                                let mut ra_tag_array: [u8; 10] = Default::default();
-                                ra_tag_array[..rating_area_tag.len()].copy_from_slice(rating_area_tag.as_bytes());
-                                insert_rate_value(
-                                    rate_hash,
-                                    &product_id,
-                                    &ra_tag_array,
-                                    &min_age,
-                                    &max_age,
-                                    &srd,
-                                    &erd,
-                                    &tus,
-                                    coverage_age,
-                                    &cost,
-                                );
-                                Ok(())
-                            }
-                        },
-                    },
-                }
-            }
-        }
+        let (product_id, min_age, max_age, ra_tag_array, srd, erd, coverage_age, tus, cost) =
+            parse_cache_rate_args(ruby, args)?;
+        let rate_hash = &mut rb_self.product_rates.borrow_mut();
+        insert_rate_value(
+            rate_hash,
+            &product_id,
+            &ra_tag_array,
+            &min_age,
+            &max_age,
+            &srd,
+            &erd,
+            &tus,
+            coverage_age,
+            &cost,
+        );
+        Ok(())
     }
 
     /// Rust implementation for the `lookup_rate` method on the
@@ -245,58 +173,18 @@ impl RateCache {
         rb_self: magnus::typed_data::Obj<Self>,
         args: &[Value],
     ) -> Result<f64, Error> {
-        let args = magnus::scan_args::scan_args::<
-            (String, String, i32, u32, u32, i16, Option<String>),
-            (),
-            (),
-            (),
-            (),
-            (),
-        >(args);
-        match args {
-            Err(x) => Err(x),
-            Ok(m_args) => {
-                let (
-                    product_id_string,
-                    rating_area_tag,
-                    y_val,
-                    m_val,
-                    d_val,
-                    coverage_age,
-                    tobacco_use_str,
-                ) = m_args.required;
-                let mut product_id: [u8; 24] = Default::default();
-                product_id[..product_id_string.len()].copy_from_slice(product_id_string.as_bytes());
-                match NaiveDate::from_ymd_opt(y_val, m_val, d_val) {
-                    None => Err(Error::new(
-                        ruby.exception_arg_error(),
-                        format!("invalid rate schedule date: {:?}", (y_val, m_val, d_val)),
-                    )),
-                    Some(d) => match parse_maybe_tobacco_use(tobacco_use_str) {
-                        Err(tus) => Err(Error::new(
-                            ruby.exception_arg_error(),
-                            format!("{:?} is not a valid value for tobacco_use", tus.clone()),
-                        )),
-                        Ok(tobacco_use) => {
-                            let mut ra_tag_array : [u8; 10] = Default::default();
-                            ra_tag_array[..rating_area_tag.len()].copy_from_slice(rating_area_tag.as_bytes());
-                            let lookup = RateLookupKey {
-                                product_id,
-                                tobacco_use,
-                                coverage_age,
-                                rating_area_tag: ra_tag_array
-                            };
-                            let rate_hash = rb_self.product_rates.borrow();
-                            match lookup_rate(&rate_hash, &lookup, &d) {
-                                Err(rle) => {
-                                    Err(Error::new(ruby.exception_arg_error(), format!("{}", rle)))
-                                }
-                                Ok(r) => Ok(r),
-                            }
-                        }
-                    },
-                }
-            }
+        let (product_id, rating_area_tag, d, coverage_age, tobacco_use) =
+            parse_lookup_rate_args(ruby, args)?;
+        let lookup = RateLookupKey {
+            product_id,
+            tobacco_use,
+            coverage_age,
+            rating_area_tag
+        };
+        let rate_hash = rb_self.product_rates.borrow();
+        match lookup_rate(&rate_hash, &lookup, &d) {
+            Err(rle) => Err(Error::new(ruby.exception_arg_error(), format!("{}", rle))),
+            Ok(r) => Ok(r),
         }
     }
 }
