@@ -1,4 +1,4 @@
-name: Tests
+name: Build
 on:
   push:
   workflow_dispatch:
@@ -37,4 +37,25 @@ jobs:
       - name: Run Tests
         run: |
           bundle exec rake test
+  docs:
+    needs: [codelint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          rubygems: 3.3.11
+      - name: Install Gems
+        run:
+          bundle install
+      - name: Build Documents
+        run:
+          bundle exec rake yard
+      - name: Upload Doc Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdocs
+          path: doc
       

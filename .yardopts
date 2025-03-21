@@ -1,1 +1,1 @@
-lib/**/*.rb ext_doc/**/*.rb
+lib/**/*.rb --no-cache
