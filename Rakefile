@@ -26,7 +26,7 @@ end
 
 crate_doc_sources = Dir.glob("ext/**/*.*")
 
-cargo_script = (ENV["GITHUB_CI"] == "true") ? "./cargoci" : "./cargo"
+cargo_script = ENV["GITHUB_CI"] == "true" ? "./cargoci" : "./cargo"
 
 file "target/doc" => crate_doc_sources do
   require "open3"
