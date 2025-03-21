@@ -51,6 +51,8 @@ jobs:
         run:
           bundle install
       - name: Build Documents
+        env:
+          GITHUB_CI: true
         run:
           bundle exec rake yard
       - name: Upload Doc Artifact

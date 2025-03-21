@@ -32,7 +32,6 @@ file "target/doc" => crate_doc_sources do
   require "open3"
 
   FileUtils.rm_f "target/doc"
-  FileUtils.rm_f "doc/crate_docs"
 
   cmd = "#{cargo_script} doc --no-deps --document-private-items"
   Open3.popen3(cmd) do |_stdin, stdout, stderr, thread|
@@ -51,5 +50,6 @@ end
 YARD::Rake::YardocTask.new(yard: "target/doc")
 
 Rake::Task["yard"].enhance do
+  FileUtils.rm_f "doc/crate_docs"
   FileUtils.cp_r "target/doc", "doc/crate_docs"
 end
