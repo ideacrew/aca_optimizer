@@ -60,7 +60,7 @@ module AcaOptimizer
   #    # @param tobacco_use         [String | nil] tobacco usage for the person
   #    # @return [Double] the found cost
   #    # @raise [ArgumentError] invalid arguments provided, or no
-  #    #   corresponding data found  
+  #    #   corresponding data found
   #    def lookup_rate(
   #      product_id,
   #      rating_area,
